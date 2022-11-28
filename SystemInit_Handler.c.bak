@@ -1,0 +1,587 @@
+/*! \file **********************************************************************
+ *
+ *  \brief 
+ *
+ 
+ *  \author 
+ *
+ *  Copyright (c) 2021 CT Control Technology .
+ ******************************************************************************/
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include "SystemInit_Handler.h"
+
+
+//---[ Macros ]-----------------------------------------------------------------
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+
+//---[ Private Functions ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+
+//---[ Private Function Definitions ]-------------------------------------------
+
+void System_Init(void)
+{
+
+	ROM_FPUEnable() ; 
+	ROM_FPULazyStackingEnable();
+	ui32SysClock = SysCtlClockGet() ;
+	ROM_SysCtlClockSet(SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ | SYSCTL_SYSDIV_2_5);	
+//	ROM_SysCtlClockSet( SYSCTL_USE_OSC | SYSCTL_XTAL_16MHZ);	
+	ui32SysClock = SysCtlClockGet() ;
+	
+	SysTick_Timer();
+	analog_channel_init();
+  DIO_Init();	
+	I2C_Init();
+	SSI_Init();
+	UART_Init();
+	FRAMInit();
+	DAC_Init();
+	FlowSensorInit();
+}
+
+void 	DAC_Init()
+{
+	/* DAC1 init */
+	DAC1.dacAddrs = 0x10;
+	DAC1.i2c_base = I2C3_BASE;
+	DAC1.outputVal = 0;
+	DAC1.dacFun = 0;
+	DAC1.dac_err_status = 0;
+	DAC1.dataPacket[0] = 0;
+	DAC1.dataPacket[1] = 0;	
+	DAC1.dataPacket[2] = 0;
+	
+	/* DAC2 init */
+	DAC2.dacAddrs = 0x12;
+	DAC2.i2c_base = I2C3_BASE;
+	DAC2.outputVal = 0;
+	DAC2.dacFun = 0;
+	DAC2.dac_err_status = 0;
+	DAC2.dataPacket[0] = 0;
+	DAC2.dataPacket[1] = 0;	
+	DAC2.dataPacket[2] = 0;		
+}
+
+void FRAMInit()
+{
+	fRAM.i2c_base = I2C4_BASE;
+	fRAM.err_status = 0;
+	fRAM.local_addrss_MSB = 0;
+	fRAM.local_addrss_LSB = 0;
+	fRAM.index = 0;
+	factory_variable_Read();
+//	FRAM_DataStoring();
+	
+//	FRAM_DataReading();
+
+//	FRAM_DataAcqusition();
+	
+	ctrlWriteParam.State = 1;
+	ctrlWriteParam.Vent_Mode = 1;
+//	
+//	ctrlWriteParam.Pat_TrigMode=1;
+//	
+//	ctrlWriteParam.Vent_Mode = 2; // Pressure Control Mode Selection
+}
+
+void FlowSensorInit()
+{
+	AirFlowSensor.i2c_base = I2C0_BASE;
+	AirFlowSensor.flowRead = 0;
+	AirFlowSensor.flowSensor_err_status = 0;
+	AirFlowSensor.i2c_rxBuffer[0] = 0;
+	AirFlowSensor.i2c_rxBuffer[1] = 0;	
+	AirFlowSensor.i2c_rxBuffer[2] = 0;
+	
+	O2FlowSensor.i2c_base = I2C2_BASE;
+	O2FlowSensor.flowRead = 0;
+	O2FlowSensor.flowSensor_err_status = 0;
+	O2FlowSensor.i2c_rxBuffer[0] = 0;
+	O2FlowSensor.i2c_rxBuffer[1] = 0;	
+	O2FlowSensor.i2c_rxBuffer[2] = 0;
+
+	TotalFlowSensor.i2c_base = I2C1_BASE;
+	TotalFlowSensor.flowRead = 0;
+	TotalFlowSensor.flowSensor_err_status = 0;
+	TotalFlowSensor.i2c_rxBuffer[0] = 0;
+	TotalFlowSensor.i2c_rxBuffer[1] = 0;	
+	TotalFlowSensor.i2c_rxBuffer[2] = 0;
+
+	DAC_Output_Set(&DAC1,DAC_CHANNEL_1,0,LTC2607_WR_AND_UPDATE); // AIR PV SET Function
+	DAC_Output_Set(&DAC1,DAC_CHANNEL_2,0,LTC2607_WR_AND_UPDATE); // O2 PV SET Function
+	DAC_Output_Set(&DAC2,DAC_CHANNEL_1,0,LTC2607_WR_AND_UPDATE); // EXH_VALVE_SET to 0	
+}
+
+void DIO_Init()
+{
+	
+	/* Enable the GPIO port of DIO's */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+	while(!ROM_SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOA))
+	{
+  }
+	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOJ);
+	while(!ROM_SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOJ))
+	{
+  }
+	
+  ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+	while(!ROM_SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))
+  {
+  }
+	
+  ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
+	while(!ROM_SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOC))
+  {
+  }
+
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOH);
+	while(!ROM_SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOH))
+  {
+  }
+	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOK);
+	while(!ROM_SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOK))
+  {
+  }
+	
+	/* GPIO pins configured as Inputs */
+	
+	// EXH_VALVE_ON_OFF
+	ROM_GPIODirModeSet(GPIO_PORTH_BASE, GPIO_PIN_3, GPIO_DIR_MODE_IN); 
+  ROM_GPIOPadConfigSet(GPIO_PORTH_BASE, GPIO_PIN_3, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
+	
+	// Unlock access to the commit register
+  HWREG(GPIO_PORTF_BASE + GPIO_O_LOCK) = 0x4C4F434B;
+
+	// Set the commit register for PF0 to allow changing the function
+
+  HWREG(GPIO_PORTF_BASE + GPIO_O_CR) = GPIO_PIN_0;
+		
+	// EARLY_POWER_FAIL, AUX_PURGE_VALVE_SENSE, INSP_ZERO_VALVE_SENSE
+	ROM_GPIODirModeSet(GPIO_PORTF_BASE, GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5, GPIO_DIR_MODE_IN);           
+  ROM_GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
+	
+	// BUZZER_CONTROL_IN
+	ROM_GPIODirModeSet(GPIO_PORTJ_BASE, GPIO_PIN_2, GPIO_DIR_MODE_IN);           
+  ROM_GPIOPadConfigSet(GPIO_PORTJ_BASE, GPIO_PIN_2, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPD);
+	
+	
+	
+	/* GPIO pins configured as Outputs */
+	
+	// INSP_EFFORT_VALVE, EXH_VALVE_STATUS, SAFETY_VALVE_ON_OFF
+	ROM_GPIOPinTypeGPIOOutput(GPIO_PORTH_BASE,GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_4 | GPIO_PIN_5);
+  ROM_GPIOPadConfigSet(GPIO_PORTH_BASE, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_4 | GPIO_PIN_5,
+                         GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPD);
+  ROM_GPIOPinWrite(GPIO_PORTH_BASE, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_4 | GPIO_PIN_5,0);
+	
+	// INSP_EFFORT_VALVE, BUZZER_PWM_CONTROL											 
+	ROM_GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE,GPIO_PIN_0 | GPIO_PIN_1); 
+  ROM_GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_0 | GPIO_PIN_1, GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPD);
+	ROM_GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_0 | GPIO_PIN_1,0);
+	
+  // AUX_PRES_PURGE_VALVE, INSP_PRES_ZERO_VALVE
+	ROM_GPIOPinTypeGPIOOutput(GPIO_PORTC_BASE,GPIO_PIN_4 | GPIO_PIN_5);
+	ROM_GPIODirModeSet(GPIO_PORTC_BASE,GPIO_PIN_4 | GPIO_PIN_5,GPIO_DIR_MODE_OUT);	
+  ROM_GPIOPadConfigSet(GPIO_PORTC_BASE, GPIO_PIN_4 | GPIO_PIN_5,
+                         GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPD);
+  ROM_GPIOPinWrite(GPIO_PORTC_BASE, GPIO_PIN_4 | GPIO_PIN_5,0);	
+
+	//GPIO Testing Purpose - LED1,LED2(PJ0,PJ1)
+	ROM_GPIOPinTypeGPIOOutput(GPIO_PORTJ_BASE,GPIO_PIN_0 | GPIO_PIN_1);
+ // ROM_GPIOPadConfigSet(GPIO_PORTJ_BASE, GPIO_PIN_0 | GPIO_PIN_1, GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPD);
+  ROM_GPIOPinWrite(GPIO_PORTJ_BASE, GPIO_PIN_0 | GPIO_PIN_1,0);	
+
+//	HWREG(GPIO_PORTK_BASE + GPIO_O_LOCK) = GPIO_LOCK_KEY;
+//	HWREG(GPIO_PORTK_BASE + GPIO_O_CR) |= 0x01;
+//	HWREG(GPIO_PORTK_BASE + GPIO_O_LOCK) = 0;
+
+	ROM_GPIOPinTypeGPIOOutput(GPIO_PORTK_BASE,GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3); 
+//  ROM_GPIOPadConfigSet(GPIO_PORTK_BASE, GPIO_PIN_3 , GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPD);
+	ROM_GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3,0);
+	
+	// Flow Sensor Reset
+	ROM_GPIOPinTypeGPIOOutput(GPIO_PORTA_BASE,GPIO_PIN_5);
+  ROM_GPIOPadConfigSet(GPIO_PORTA_BASE, GPIO_PIN_5 , GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPU);
+	ROM_GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_5,0);
+	Delay_Millis(10);
+	ROM_GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_5,GPIO_PIN_5);
+		
+}
+
+void I2C_Init()
+{
+
+	/* I2C0 for AIR FLOW SENSOR */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_I2C0);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_I2C0));
+	
+	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB));
+	
+	ROM_GPIOPinConfigure(GPIO_PB2_I2C0SCL);
+	ROM_GPIOPinTypeI2CSCL(GPIO_PORTB_BASE, GPIO_PIN_2);		
+	
+	ROM_GPIOPinConfigure(GPIO_PB3_I2C0SDA);
+	ROM_GPIOPinTypeI2C(GPIO_PORTB_BASE, GPIO_PIN_3);			
+	
+	
+	ROM_I2CMasterInitExpClk(I2C0_BASE, SysCtlClockGet(), false);	/* Set clock speed for I2C command , true=400kHz, false=100kHz*/
+
+	/* I2C1 for TOTAL FLOW SENSOR */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_I2C1);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_I2C1));
+	
+	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOA));
+	
+	ROM_GPIOPinConfigure(GPIO_PA6_I2C1SCL);
+	ROM_GPIOPinTypeI2CSCL(GPIO_PORTA_BASE, GPIO_PIN_6);		
+	
+	ROM_GPIOPinConfigure(GPIO_PA7_I2C1SDA);
+	ROM_GPIOPinTypeI2C(GPIO_PORTA_BASE, GPIO_PIN_7);			
+	
+	
+	ROM_I2CMasterInitExpClk(I2C1_BASE, SysCtlClockGet(), false);	/* Set clock speed for I2C command , true=400kHz, false=100kHz*/
+
+	/* I2C2 for O2 FLOW SENSOR */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_I2C2);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_I2C2));
+	
+	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF));
+	
+	ROM_GPIOPinConfigure(GPIO_PF6_I2C2SCL);
+	ROM_GPIOPinTypeI2CSCL(GPIO_PORTF_BASE, GPIO_PIN_6);		
+	
+	ROM_GPIOPinConfigure(GPIO_PF7_I2C2SDA);
+	ROM_GPIOPinTypeI2C(GPIO_PORTF_BASE, GPIO_PIN_7);			
+	
+	
+	ROM_I2CMasterInitExpClk(I2C2_BASE, SysCtlClockGet(), false);	/* Set clock speed for I2C command , true=400kHz, false=100kHz*/
+	
+	/* I2C3 for DAC */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_I2C3);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_I2C3));
+	
+	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOG);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOG));
+	
+	ROM_GPIOPinConfigure(GPIO_PG0_I2C3SCL);
+	ROM_GPIOPinTypeI2CSCL(GPIO_PORTG_BASE, GPIO_PIN_0);		
+	
+	ROM_GPIOPinConfigure(GPIO_PG1_I2C3SDA);
+	ROM_GPIOPinTypeI2C(GPIO_PORTG_BASE, GPIO_PIN_1);			
+	
+	
+	ROM_I2CMasterInitExpClk(I2C3_BASE, SysCtlClockGet(), true);	/* Set clock speed for I2C command , true=400kHz, false=100kHz*/
+
+/* I2C4 for FRAM */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_I2C4);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_I2C4));
+	
+	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOG);
+	while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOG));
+	
+	ROM_GPIOPinConfigure(GPIO_PG2_I2C4SCL);
+	ROM_GPIOPinTypeI2CSCL(GPIO_PORTG_BASE, GPIO_PIN_2);		
+	
+	ROM_GPIOPinConfigure(GPIO_PG3_I2C4SDA);
+	ROM_GPIOPinTypeI2C(GPIO_PORTG_BASE, GPIO_PIN_3);			
+	
+	
+	ROM_I2CMasterInitExpClk(I2C4_BASE, SysCtlClockGet(), true);	/* Set clock speed for I2C command , true=400kHz, false=100kHz*/	
+}
+
+
+void UART_Init()
+{
+	/* UART0 for Rs422 to Communicate DU */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+	
+
+	ROM_GPIOPinConfigure(GPIO_PA0_U0RX);
+	ROM_GPIOPinConfigure(GPIO_PA1_U0TX);
+	
+  ROM_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+	
+	
+	ROM_GPIOPadConfigSet(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1,
+                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD_WPU);
+ 
+	
+	UARTStdioConfig(0,115200,ROM_SysCtlClockGet());
+	
+
+
+	/* UART1 for Exhalation Flow Sensor/Proximal Flow Sensor to Communicate DU */	
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_UART1);
+	
+
+	ROM_GPIOPinConfigure(GPIO_PB0_U1RX);
+	ROM_GPIOPinConfigure(GPIO_PB1_U1TX);
+	
+  ROM_GPIOPinTypeUART(GPIO_PORTB_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+	
+	
+	ROM_GPIOPadConfigSet(GPIO_PORTB_BASE, GPIO_PIN_0 | GPIO_PIN_1,
+                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD_WPU);
+
+	UARTStdioConfig1(1,115200,ROM_SysCtlClockGet());	
+	
+	
+	
+	/* UART2  testing */
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOG);
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_UART2);
+	
+
+	ROM_GPIOPinConfigure(GPIO_PG4_U2RX);
+	ROM_GPIOPinConfigure(GPIO_PG5_U2TX);
+	
+  ROM_GPIOPinTypeUART(GPIO_PORTG_BASE, GPIO_PIN_4 | GPIO_PIN_5);
+	
+	
+	ROM_GPIOPadConfigSet(GPIO_PORTG_BASE, GPIO_PIN_4 | GPIO_PIN_5,
+                         GPIO_STRENGTH_4MA, GPIO_PIN_TYPE_STD_WPU);
+// 
+//	
+	UARTStdioConfig2(2,115200,ROM_SysCtlClockGet());	
+		
+}
+
+void PacketizingRemoteDataDebug()
+{
+	unsigned int uindex = 0;
+	unsigned char packet[50] = {0};
+	
+	
+		packet[uindex++] = '*';
+		packet[uindex++] = 'H';
+		packet[uindex++] = 'e';
+		packet[uindex++] = 'l';
+		packet[uindex++] = 'l';
+		packet[uindex++] = 'o';
+		packet[uindex++] = 'W';
+		packet[uindex++] = 'o';
+		packet[uindex++] = 'r';
+		packet[uindex++] = 'l';
+		packet[uindex++] = 'd';
+		packet[uindex++] = '*';	
+		packet[uindex++] = '\n';
+	
+//	UARTFlushRx();
+	
+		UARTFlushTx(1);
+		UARTwrite(packet,uindex);	
+	
+}
+
+void Delay_Millis(unsigned int millsec)
+{
+	millis = millsec;
+	Delay_Flag = 1;
+	while(millis);
+	Delay_Flag = 0;
+}
+
+void SysTick_Timer()
+{
+	SysTickPeriodSet(SysCtlClockGet() / 1000);	//1 ms	interrupt	
+//	SysTickPeriodSet((SysCtlClockGet() / 10000)*5);	//500 micro second	interrupt	
+	SysTickIntRegister(&SysTick_Handler);
+	SysTickEnable();
+	IntMasterEnable();
+}
+
+void SysTick_Handler(void)
+{
+	SysTickCount_10ms++;
+	SysTickCount_100ms++;
+	SysTickCount_5ms++;
+	SysTickCount_1s++;
+	ServCmd_Counter ++;
+	AirPVSetCount_1s++;
+	O2PVSetCount_1s++;
+	SettlingCounter++;
+
+	flag_1ms = 1;
+	
+	Delay_Flag = 1;
+	if(Delay_Flag == 1)
+		millis--;
+	Delay_Flag = 0;	
+	
+	if(SysTickCount_5ms>=5)
+	{
+		flag_5ms=1;
+		SysTickCount_5ms++;
+	}
+//	if(SettlingCounter > 90000)
+//	{
+//		SettlingFlag = 1;
+//	}
+//	if(AirPVSetCount_1s >= 4000)
+//	{
+//		AirPVSetFlag_1s  = 1;
+//		AirPVSetCount_1s = 0;
+//	}
+
+//	if(O2PVSetCount_1s >= 1000)
+//	{
+//		O2PVSetFlag_1s  = 1;
+//		O2PVSetCount_1s = 0;
+//	}
+	
+	if(ServCmd_Counter >= 1000)
+	{
+		ServCmd_TimeoutFlag = 1;
+		ServCmd_Counter = 0;
+	}
+	if(DU_CMD_InitTimerFlag == 1)
+	{
+		READ_TimeoutCounter++;
+		WRITE_SIN_TimeoutCounter++;
+		WRITE_MUL_TimeoutCounter++;
+		
+		if(READ_TimeoutCounter > READ_CMD_TIMEOUT)
+		{
+			READ_CMD_TimeoutFlag = 1;
+			READ_TimeoutCounter = 0;
+		}
+
+		if(WRITE_SIN_TimeoutCounter > WR_SIN_CMD_TIMEOUT)
+		{
+			WR_SIN_CMD_TimeoutFlag = 1;
+//			READ_CMD_TimeoutFlag = 0;			
+			WRITE_SIN_TimeoutCounter = 0;
+		}	
+
+		if(WRITE_MUL_TimeoutCounter > WR_MUL_CMD_TIMEOUT)
+		{
+			WR_MUL_CMD_TimeoutFlag = 1;
+//			READ_CMD_TimeoutFlag = 0;
+//			WR_SIN_CMD_TimeoutFlag = 0;			
+			WRITE_MUL_TimeoutCounter = 0;
+		}		
+
+	}
+	
+	if(ServResp_TimerInitFlag == 1)
+	{
+		DU_Resp_TimeoutCounter++;
+		
+		if(DU_Resp_TimeoutCounter > DU_RESP_TIMEOUT)
+		{
+			DU_Resp_TimeoutFlag = 1;
+			DU_Resp_TimeoutCounter = 0;
+		}
+	}
+	
+	if(DU_ServResp_InitTimerFlag == 1)
+	{
+		ServResp_TimeoutCounter++;
+		
+		if(ServResp_TimeoutCounter > SERV_RESP_TIMEOUT)
+		{
+			ServResp_TimeoutFlag = 1;
+			ServResp_TimeoutCounter = 0;
+		}
+	}
+
+	
+	if(SysTickCount_10ms >= 10)
+	{		
+		flag_10ms = 1;
+		SysTickCount_10ms = 0;
+	}
+	
+	if(SysTickCount_100ms >= 100)
+	{
+		flag_100ms = 1;
+		SysTickCount_100ms = 0;
+	}
+	
+	if(flag_50ms==1)//flow sensor reset counter
+	{
+		SysTickCount_50ms++;
+		if(SysTickCount_50ms >=50)
+		{
+			flag_50ms=0;
+			FlowSensorReset=0;
+
+		}
+	}
+	
+	if(SysTickCount_1s >= 1000)
+	{
+		flag_1s = 1;
+		SysTickCount_1s = 0;		
+	}
+	
+	if(ulInhalationFlag == 1)
+	{
+		ulInhalationCounter++;
+		ulRiseTimeCounter++; 
+	}
+	if(ulExhalationFlag == 1)
+	{
+		ulExhalationCounter++;
+	}
+	if(ulPauseFlag == 1)
+	{
+		ulPuaseCounter++;
+	}
+	
+	if(RC_Init == 1)
+	{
+		RC_ConstCount++;
+	}
+	
+	if(RC_TimeInit == 1)
+	{
+		RC_TimeCount++;
+	}
+//	if(Time100mS_Init == 1)
+//	{
+//		Time100mS_Count++;		
+//	}
+//	if(Backup_init == 1)
+//	{
+//		Backup_wait++;		
+//	}
+	
+	if(apneacount_flag==1)
+	{
+		apneacount_time++;
+	}
+		if(ulSimvperiodflag==1)
+	{
+		ulSimvperiodcounter++;
+	}
+	if(ulSpontperiodflag==1)
+	{
+		ulSpontperiodcounter++;
+	}
+
+}

@@ -1,0 +1,115 @@
+/*! \file **********************************************************************
+ *
+ *  \brief  Implementation of Module for Flow Sensors
+ *
+ 
+ *  \author 
+ *
+ *  Copyright (c) 2021 CT Control Technology .
+ ******************************************************************************/
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include "ExhFlowSensor.h"
+
+//---[ Macros ]-----------------------------------------------------------------
+
+//---[ Constants ]--------------------------------------------------------------
+
+//---[ Public Variables ]-------------------------------------------------------
+
+uint16_t exh_fail_cnt=0;
+
+
+//---[ Private Variables ]------------------------------------------------------
+
+//---[ Private Functions ]------------------------------------------------------
+
+//---[ Function Implementations ]-----------------------------------------------
+uint8_t crc8CheckUpdate_exh(uint8_t data[], uint8_t bytelength)
+{
+	uint8_t bit;
+	uint8_t crc = 0;
+	uint8_t byteCtr;
+	
+	/* Implementing 8 bit CRC algorithm  for SF05 */
+	for(byteCtr = 0; byteCtr < bytelength; byteCtr++)
+  {
+    crc ^= (data[byteCtr]);
+    for(bit = 8; bit > 0; --bit)
+    {
+      if(crc & 0x80) crc = (crc << 1) ^ 0x31;            // generator polynomial G(x) is 0x31
+      else           crc = (crc << 1);
+    }
+  }
+	
+	return crc;                                            // returns the calculated CRC value
+}
+
+
+void ExhFlowSensor(void)
+{
+		int id=0;
+	UARTwrite1((const char*)uart_array,4); // Sending Get_FlowSensor_Measurement Cmd to Slave
+
+	if(UARTRxBytesAvail1())
+	{
+			if(UARTRxBytesAvail1() >= 8)
+			{
+				do
+				{
+						uart_array_1[id++]=UARTgetc1();
+					
+				}while(UARTRxBytesAvail1()> 0);
+			
+				if(uart_array_1[0]==0x01 && uart_array_1[1]==0x10 && uart_array_1[2]==0x04)
+				{
+					u8CRC_Cal = crc8CheckUpdate_exh(uart_array_1,7);
+					u8CRC_Rxd = uart_array_1[7];
+
+					if(u8CRC_Rxd == u8CRC_Cal)
+					{
+
+							f_rawdata = uart_array_1[3];
+							f_rawdata = f_rawdata | (uart_array_1[4] << 8);
+							f_rawdata = f_rawdata | (uart_array_1[5] << 16);
+							f_rawdata = f_rawdata | (uart_array_1[6] << 24);
+							
+							flowslpm = (float)f_rawdata;
+							flowslpm = flowslpm/1000;
+						
+//							flowslpm = 1.2264*flowslpm-1.4873; //exhalational flow sensor calibration 280322
+											
+							fAverageArray_Exh[u32AverageIndex_Exh++] = flowslpm; 
+				
+							fAverage_E = 0;
+							
+							if(u32AverageIndex_Exh >= 5)
+							{
+								u32AverageIndex_Exh = 0;
+							}
+							
+							for(int uIndex = 0; uIndex < 5; uIndex++)
+							{
+								fAverage_E += fAverageArray_Exh[uIndex]; 
+							}
+							
+							EXH_FLOW = (float)fAverage_E/5; 
+							
+							EXH_FLOW = sysParam.Exh_flowsensor[0]*pow(EXH_FLOW,2) + sysParam.Exh_flowsensor[1]*EXH_FLOW + sysParam.Exh_flowsensor[2]; //exhalational flow sensor calibration 280322
+
+							ctrlReadParam.Exh_Flow=EXH_FLOW;
+								
+							
+							exh_fail_cnt=0;              //Technical alarm check 
+							Tech_Alarmcheck.exh_flow_sensor=0;
+					}
+				}		
+			}	
+		}
+		else
+			exh_fail_cnt++;											// count will increse if there is ncommunication
+				Tech_Alarmcheck.exh_flow_sensor=(exh_fail_cnt > 20) ? 1 : 0;  //assigning technical alrm for exhalation flow sensor
+}
+
+

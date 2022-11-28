@@ -1,0 +1,168 @@
+#ifndef _VENTALGORITHM_HANDLER_H_
+#define _VENTALGORITHM_HANDLER_H_
+
+////////////////////////////////////////////////////////////////////////////////
+//! \file 
+///
+///  \brief 
+///
+///  \author 
+///
+///  Copyright (c) 2021 CT Control Technology .
+////////////////////////////////////////////////////////////////////////////////
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include <stdint.h>
+#include "main.h"
+#include "uartstdio.h"
+#include "LTC2607_DAC_Handler.h"
+#include "Calib_Handler.h"
+#include "VolumeCtrlMode_Handler.h"
+#include "PressureCtrlMode_Handler.h"
+#include "PressureSupport.h"
+#include "cpap_mode.h"
+#include "simv.h"
+#include "PRVC.h"
+#include "FM3164_Memory.h"
+#include "NIV_AlgorithmHandler.h"
+
+
+
+
+//---[ Macros ]-----------------------------------------------------------------
+
+
+// Ventilator Modes
+#define VOL_CTRL_MODE 				0x01
+#define PRESSURE_CTRL_MODE 		0x02 
+#define PRESSURESUPPORT       0x03
+#define SIMV 									0x04
+#define PRVC_ 							  0x05
+#define CPAP									0x06
+#define NIV 									0x07
+
+// Patient Trigger Modes
+#define FLOW_TRIGGER_MODE 				0x01
+#define PRESSURE_TRIGGER_MODE 		0x02
+#define NO_TRIGGER								0x03
+
+#define FLOW_AIR 1
+#define FLOW_O2 0
+
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+typedef struct _VentAlgSettings
+{
+	float ulPauseTime;
+	float ulRiseTime;
+	float ulTotalBreathTime;
+	float ulInhalationTime;
+	float ulExhalationTime;
+	float ulInhalationFlow;
+	float ulO2Flow;
+	float ulAirFlow;
+	float simv_period;
+	float spont_period;
+	float simv_RR;
+
+	
+	
+}VentAlgSettings;
+
+typedef struct _VentAlgParame
+{
+	float PressureTrigger;
+	float PatientTriggerWindow;
+	float FlowTrigger;
+	float Ppeak;
+	float Pplatue;
+	float Peakflow;
+	uint32_t ulPVValueAir;
+	uint32_t ulPVValueO2;
+	uint32_t ulPVValueEV;
+	
+}VentAlgParameters;
+
+
+//---[ Private variables ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+
+extern uint8_t state, flag_10ms, flag_100ms, flag_1s , flag_4s;
+extern volatile uint8_t Status_Check;
+extern ctrlReadReg ctrlReadParam;
+extern ctrlWriteReg ctrlWriteParam,ctrlWriteRead;
+extern ctrlServiceReg ctrlServParam;
+extern uint8_t VentRunFlag, VentSettingsChange;
+extern tech_alarmReg  Tech_Alarmcheck;
+extern calibrationvalues sysParam;
+extern calibrationvalues userParam;
+
+
+extern VentAlgSettings ventAlgorithmSettings;
+extern uint32_t ulPVValueAir, ulPVValueO2, ulPVValueInhale, ulPVValueEV;
+extern DACInfo DAC1,DAC2;
+extern uint32_t ulInhalationFlag, ulExhalationFlag, ulPauseFlag,ulFlowControllerFlag, ulRiseTimeFlag, ulPeepFlag;
+extern uint32_t ulInhalationCounter,ulPuaseCounter,ulExhalationCounter, ulRiseTimeCounter;
+
+extern VentAlgParameters ventAlgParam;
+extern uint32_t TimeStampTest, x, y , z;
+extern float Error_Test,Timestamp_Test;
+extern uint32_t RC_ConstCount,RC_Init;
+
+extern float Error,Error_10ms,Error_Accum, Error_Tem;
+extern float Kp,Ki,Kd,PropTerm,IntegralTerm,DeriveTerm;
+extern float Tube_Compl;
+extern float P_Error;
+extern float P_Kp, P_Ki , P_Kd ,P_PropTerm ,P_IntegralTerm ,P_DeriveTerm;
+extern float EXH_FLOW;
+
+extern uint8_t RISE_FLAG;
+extern float check_pressure[2],diff_pressure[2];
+
+extern uint32_t ulSimvperiodcounter,ulSpontperiodcounter;
+extern uint8_t  ulSimvperiodflag,ulSpontperiodflag,patienttriggerflag;
+
+
+extern uint8_t VCV_breath;
+extern uint32_t SettlingFlag, SettlingCounter, SettlingTimoutFlag;
+extern uint8_t	pid_f,Peep_Flag;
+extern uint32_t RC_TimeInit,RC_TimeCount, RC_TimeVar,Time100mS_Init,Time100mS_Count,RiseTimeEnabled;
+extern float PCM_Flow,RC_Time,Exh_DACVal;
+extern uint32_t Backup_wait,Backup_init,apneacount_time,apneacount_flag,apneaalarm_flag;
+//---[ Public Function Prototypes ]---------------------------------------------
+
+
+void VentAlgorithmSettings(void);
+void Vent_Algorithm(void);
+
+
+
+void FlowControlLoop(uint32_t mode);
+void AirPV_Set(void);
+void O2PV_Set(void);
+//float error_calc(signed);
+float Air_Flow_calc(signed);
+float O2_Flow_calc(signed);
+void PID_ExhControl_Loop(void);
+void FlowTrigger(void);
+void PressureTrigger(void);
+void PID_PressureControl_Loop(void);
+void RiseTime_Acquisition(uint32_t *);
+void RiseTime_FlowCtrl(uint32_t *);
+void pressure_autocorr(void);
+void comp_calculation(void);
+void resis_calculation(void);
+void PEEP_control(void);
+void flow_control(void);
+
+
+#endif
+

@@ -1,0 +1,85 @@
+#ifndef _SCHEDULER_HANDLER_H_
+#define _SCHEDULER_HANDLER_H_
+
+////////////////////////////////////////////////////////////////////////////////
+//! \file 
+///
+///  \brief 
+///
+///  \author 
+///
+///  Copyright (c) 2021 CT Control Technology .
+////////////////////////////////////////////////////////////////////////////////
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include <stdint.h>
+
+#include "uartstdio.h"
+#include "SFM4200_FlowSensor.h"
+#include "ModbusCommn_Handler.h"
+#include "main.h"
+#include "debug_mode.h"
+
+
+//---[ Macros ]-----------------------------------------------------------------
+
+// Scheduler States
+#define MAIN_STATE_STOP 		0x03
+#define MAIN_STATE_RUN 			0x02
+#define MAIN_STATE_STANDBY 	0x01
+#define MAIN_STATE_DIAG 		0x04
+#define MAIN_STATE_RESET 		0x05
+
+#define FLAG_SET 0x01
+
+// Ventilator Modes
+//#define VOL_CTRL_MODE 				0x01
+//#define PRESSURE_CTRL_MODE 		0x02
+//#define PRESSURESUPPORT       0X03
+//#define CPAP_MODE							0x04
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+
+
+//---[ Private variables ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+
+extern uint8_t state, flag_10ms, flag_100ms, flag_1ms,flag_5ms;
+extern uint32_t ulInhalationFlag;
+extern ctrlReadReg ctrlReadParam;
+extern ctrlWriteReg ctrlWriteParam;
+extern ctrlServiceReg ctrlServParam;
+extern uint8_t VentRunFlag, VentSettingsChange;
+
+extern float Error,Error_10ms,Error_Accum, Error_Temp;
+extern uint8_t FlowSensorReset;
+extern float Max_E_Tidal_vol,Volume_read;
+//---[ Public Function Prototypes ]---------------------------------------------
+
+void stateRun(void);
+void stateStop(void);
+void stateStandBy(void);
+void stateDiagnostic(void);
+void stateReset(void);
+void VentAlgorithmSettings(void);
+void Vent_Algorithm(void);
+void VolCtrl_Algorithm(void);
+void PressureCtrl_Algorithm(void);
+void pressuresupport(void);
+
+extern void ADC_DataAcq(void);
+extern void FlowSensor_dataAcq(void);
+extern void Modbus_Service_MessageTx(void);
+extern void SSI_Communication(void);
+
+#endif
+
+

@@ -1,0 +1,9 @@
+.\objects\crc.o: CRC.c
+.\objects\crc.o: CRC.h
+.\objects\crc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+.\objects\crc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\crc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+.\objects\crc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+.\objects\crc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\crc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h
+.\objects\crc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h

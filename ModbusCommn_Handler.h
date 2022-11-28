@@ -1,0 +1,137 @@
+#ifndef _MODBUSCOMMN_HANDLER_H_
+#define _MODBUSCOMMN_HANDLER_H_
+
+////////////////////////////////////////////////////////////////////////////////
+//! \file 
+///
+///  \brief 
+///
+///  \author 
+///
+///  Copyright (c) 2021 CT Control Technology .
+////////////////////////////////////////////////////////////////////////////////
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "main.h"
+#include "CRC16.h"
+#include "uartstdio.h"
+
+
+//---[ Macros ]-----------------------------------------------------------------
+
+// DEVICE ID
+#define CONTROL_BOARD_ID 0x01
+#define MONITOR_BOARD_ID 0x02
+#define PM_BOARD_ID 		 0x03
+#define DU_BOARD_ID      0x04
+
+// FUNCTION CODE
+#define MODBUS_READ 						0x03
+#define MODBUS_WRITE_SINGLE 		0x06
+#define MODBUS_WRITE_MULTIPLE 	0x10
+#define MODBUS_SERVICE 					0x12
+
+// READ REGISTER
+#define MODBUS_READ_REG_START_ADDR 	1
+#define MODBUS_READ_REG_END_ADDR 		20
+#define MAX_NUM_MODBUS_READ_REG_BYTES 80 // 20*4 no. of Registers
+
+// WRITE REGISTER
+#define MODBUS_WRITE_REG_START_ADDR 	1
+#define MODBUS_WRITE_REG_END_ADDR 		35
+#define MAX_NUM_MODBUS_WRITE_REG_BYTES 140 // 33*4 no. of Registers
+
+// SERVICE REGISTER
+
+#define MODBUS_SERV_REG_START_ADDR 	1
+#define MODBUS_SERV_REG_END_ADDR 		7
+#define MAX_NUM_MODBUS_SERV_REG_BYTES 28 // 7*4 no. of Registers
+
+#define MODBUS_COMMN_TIMEOUT 3
+
+#define WRITE_REG_OK 1
+#define WRITE_REG_NOT_OK 0
+
+
+#define READ_CMD_TIMEOUT 		1    // 8 bytes total(8*86.8microS=694.4microS) , 694.4microS < 1mS (1mS SystickInterrupt) roundoff to 1
+#define WR_SIN_CMD_TIMEOUT	2    // 12 bytes total(12*86.8microS=1041.6microS) , 1041.6microS < 2mS (1mS SystickInterrupt) roundoff to 2
+#define WR_MUL_CMD_TIMEOUT	13    // 130 bytes total(130*86.8microS=11,284microS) , 11,284microS < 13mS (1mS SystickInterrupt) rounoff to 11 
+
+#define SERV_RESP_TIMEOUT 		1    // 8 bytes total(8*86.8microS=694.4microS) , 694.4microS < 1mS (1mS SystickInterrupt) roundoff to 1
+#define DU_RESP_TIMEOUT 		10    
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+typedef enum _modbusCommnStatus
+{
+	MODBUS_COMM_SUCCESSFULL = 0x01,
+	MODBUS_COMM_NOT_SUCCESSFULL,
+	MODBUS_ILLEGAL_DATA_PKT_RXD,
+	MODBUS_ILLEGAL_DESTINATION_ID,
+	MODBUS_CRC_MISMATCH_ERROR,
+	MODBUS_ILLEGAL_FUNCTION_CODE,
+	MODBUS_ILLEGAL_READ_REG_ADDR,
+	MODBUS_ILLEGAL_READ_NUM_REG,
+	MODBUS_ILLEGAL_WRITE_SINGLE_REG_ADDR,
+	MODBUS_ILLEGAL_WRITE_SINGLE_NUM_REG,
+	MODBUS_ILLEGAL_WRITE_MULTIPLE_REG_ADDR,
+	MODBUS_ILLEGAL_WRITE_MULTIPLE_NUM_REG,
+	MODBUS_SERVICE_MSG_CMD_SUCCESS,
+	MODBUS_SERVICE_MSG_RESP_SUCCESS,
+	MODBUS_SERVICE_MSG_RESP_FAIL
+	
+}modBusCommnStatus;
+
+typedef struct _modBusCommn
+{
+ unsigned char Error_Status;	
+
+}modBusCommn;
+
+
+//---[ Private variables ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+
+extern modBusCommn modBusCommnStruct;
+extern modBusCommn modBusServMsg;
+extern ctrlServiceReg ctrlServParam;
+
+extern uint8_t ucBufferArray[200], SPulIndex_page;
+extern uint32_t ulBuffIndex;
+extern uint32_t ucModbusReadReg[14], ucModbusWriteReg[29],ucModbusServReg[9];
+extern float *readPtr,*writePtr, *servPtr;
+extern volatile uint8_t DU_CMD_InitTimerFlag,READ_CMD_TimeoutFlag,WR_SIN_CMD_TimeoutFlag,WR_MUL_CMD_TimeoutFlag;
+extern volatile uint32_t READ_TimeoutCounter, WRITE_SIN_TimeoutCounter,WRITE_MUL_TimeoutCounter;
+extern volatile uint8_t DU_ServResp_InitTimerFlag,ServResp_TimeoutFlag,ServResp_Success,ServResp_TimerInitFlag,DU_Resp_TimeoutFlag;
+extern volatile uint32_t ServResp_TimeoutCounter,ServResp_Counter;
+extern unsigned short crc_calc, crc_recved;
+extern uint8_t VentRunFlag, VentSettingsChange;
+extern uint32_t TimeStampTest;
+
+//---[ Public Function Prototypes ]---------------------------------------------
+
+
+modBusCommnStatus Modbus_Communication(void);
+void Modbus_ReadReg(modBusCommn *,unsigned char *);
+void Modbus_WriteSingleReg(modBusCommn *,unsigned char *);
+void Modbus_MultipleReg(modBusCommn *,unsigned char *);
+void Modbus_Service_MessageTx(void);
+modBusCommnStatus Modbus_Service_MessageCmd(modBusCommn *,unsigned long, unsigned long);
+modBusCommnStatus Modbus_Service_MessageResp(modBusCommn *,unsigned char, unsigned char);
+void TestPacket(void);
+
+uint32_t pack_IEEE754(float);
+float unpack_IEEE754(int32_t);
+
+#endif
+

@@ -1,0 +1,83 @@
+#ifndef _PRESSURECTRLMODE_HANDLER_H_
+#define _PRESSURECTRLMODE_HANDLER_H_
+
+////////////////////////////////////////////////////////////////////////////////
+//! \file 
+///
+///  \brief 
+///
+///  \author 
+///
+///  Copyright (c) 2021 CT Control Technology .
+////////////////////////////////////////////////////////////////////////////////
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <math.h>
+
+#include "main.h"
+#include "sysctl.h"
+#include "pin_map.h"
+#include "ssi.h"
+#include "gpio.h"
+#include "uartstdio.h"
+#include "interrupt.h"
+#include "hw_memmap.h"
+#include "hw_ints.h"
+#include "hw_ssi.h"
+#include "hw_types.h"
+#include "VentAlgorithm_Handler.h"
+
+//---[ Macros ]-----------------------------------------------------------------
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+
+//---[ Private variables ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+
+extern uint32_t ulInhalationFlag, ulExhalationFlag, ulPauseFlag,ulFlowControllerFlag, ulRiseTimeFlag, ulPeepFlag;
+extern float Volume_comp,InhalCount;
+extern float Tid_Vol,flow,p_flow,compliance,Resistance,Resistance_C,P_Resistance,P_compliance,Insp_Tidal_vol;
+extern float Exh_Error,Exh_Error_1,Exh_Error_2,Exh_DACVal_1,Exh_DACVal_0,E_K,E_Ts,E_Ti,E_Td;
+extern float measurement,PEF,PCM_re,Pre_Peak,Pre_PCM_re,s_INSP_Pressure,re_50;
+extern float F_Error[2],F_Error_1[2],F_Error_2[2],F_PropTerm,F_IntegralTerm,F_DeriveTerm,F_DAC_out[2],F_DAC_out_1[2];
+extern float F_K,F_Ts,F_Ti,F_Td;
+extern int trigger_time,fl_tri_flag;
+
+extern float	P_Error_1,P_Error_2,Flow_out_1,Flow_out;
+extern float P_K,Ti,Ts,Td;
+extern float measurement,PEF,PCM_re,Pre_Peak,Pre_PCM_re,s_INSP_Pressure,re_50;
+extern float avg_pre,AVG_PRESSURE,pre_point,pre_poit_2,pre_rise,P_pre_rise;
+extern float pressure_flow;
+extern uint16_t pre_rise_f,corr_f,corr_f_chk;
+extern float P_peak;
+extern uint8_t RISE_FLAG;
+extern float pressure_max_flow;
+extern float check_pressure[2],diff_pressure[2],delta_pressure[2];
+
+extern uint16_t c_k; //pcm error array index variable for testing
+
+extern uint32_t BREATH_CNT;
+extern uint16_t	rise_error_f;
+
+
+
+//---[ Public Function Prototypes ]---------------------------------------------
+
+void PressureCtrl_Algorithm(void);
+
+#endif
+

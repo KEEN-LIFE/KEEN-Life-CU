@@ -1,0 +1,63 @@
+#ifndef _ADC_HANDLER_H_
+#define _ADC_HANDLER_H_
+
+/*! \file ********************************************************************
+ * \file ADC_Handler.h
+ *
+ *  \brief 
+ *
+ *  \author 
+ *
+ *  Copyright (c) 2021 CT Control Technology .
+ ********************************************************************/
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "sysctl.h"
+#include "gpio.h"
+#include "adc.h"
+#include "hw_memmap.h"
+#include "rom.h"
+#include "main.h"
+#include "VentAlgorithm_Handler.h"
+
+//---[ Macros ]---------------------------------------------------------------
+
+
+
+//---[ Types ]------------------------------------------------------------------ 
+
+
+
+//---[ Public Variables ]-------------------------------------------------------
+
+extern volatile float_t Exp_Pressure;
+extern ctrlReadReg ctrlReadParam;
+extern ctrlServiceReg ctrlServParam;
+extern VentAlgParameters ventAlgParam;
+extern tech_alarmReg  Tech_Alarmcheck;
+
+extern float_t  fAvgeArray_InspPressure[300],fAvgeArray_ExpPressure[10], fAvgeArray_AuxPressure[10],fAvg;
+extern uint32_t u32AvgIndex_InspPressure, u32AvgIndex_ExpPressure,u32AvgIndex_AuxPressure;
+extern uint32_t Insp_Pressure_Failure,Exp_Pressure_Failure,Aux_Pressure_Failure,PV_Check;
+extern uint32_t AirPV_Sense_Failure, O2PV_Sense_Failure,ExhPV_Sense_Failure;
+
+extern float PV_SetValue_A,PV_SetValue_O,PV_SetValue;
+
+
+//---[ Private Functions ]---------------------------------------------
+
+//---[ Public Function Prototypes ]---------------------------------------------
+
+void analog_channel_init(void);
+void adc_conversion(void);
+//uint8_t Control_Data_Acq(void);
+
+//uint32_t test_DU(void);
+void ADC_DataAcq(void);
+void adcSerialPacketization(void);
+void PV_AlarmGeneration(void);
+
+#endif

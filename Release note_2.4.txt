@@ -1,0 +1,62 @@
+KEEN VENTILATOR 2.4
+====================================================================
+Release date     :28 November 2022
+
+Version          :2.4
+
+Copyright (c) 2022 KEEN TECHNOLOGY INITIATIVES PVT LTD.
+
+Modifications _Control_Board
+====================================================================
+
+PRVC mode :									
+									1)Pressure Regulated Volume Control mode will give set tidal volume with optimal constant pressure
+									2)This mode give two volume control breaths and measure pplateau pressure, and this pressure will be the set pressure for the prvc mode.
+									3)If any pressure drop occurs also it start with new volume contoll mode breaths.
+									4)The volume will reach to set tidal volume by adjusting the pressure.
+									5)The change pressure is identified by calculating complaince of the lungs.
+									6)The complaince is the average of consecutive five breaths.
+									7)The pressure change  is the ratio of volume error and measured complaince.
+Preuse check :
+									1)Preuse check is the list of continuos test on ventilator before going to ventilation.
+									2)In this ventilator it include eight tests from different board.
+									3)The preuse check is defined as 9th mode in tha ventilator.
+									4)A write register is used for preusecheck, through this register DU is communicating with controller.
+									5)A status register bit also used in the logic,which will inform the DU after each test.The register name is "puc_update".
+									6)Each test has 5 sec delay except o2 sensor and pressure sensor check.
+Patient circuit test:
+									1)This is also part of ventilator test which mainly concern about the breathing circuit of the ventilator.
+									2)The test also include as 10th mode of the ventilator.
+									3)The results will calculated by the DU(Complaince and Resistance of the breathing circuit)
+Self Diagnostics:					
+									1)Self Diagnostics is the sequence of test for the working of ventilator.
+									2)DU will put queris to get the read registter from different board.
+									3)This function will run under diagnostics section  of the code.
+Medical Procedure :					
+									1)Medical Procedure includes three functions Inspiratory hold,Expiratory hold and manual Breath.
+									2)Two write registers are defined for this functionality "Med_Proc" and "Hold time".
+									3)Med_Proc will hold the function to be performed and Hold time will give working time for each function.
+									4)This function will run in every 1ms intervel.
+
+
+Modifications _Monitor_Board
+====================================================================
+
+Self Diagnostics:	
+									1)All read register can access by the DU by sending queries.
+							
+Modifications _Power_Board
+====================================================================
+
+Battery Mangaement System:
+									1)The power is communcating with battery and bms through I2C communication.
+									2)The board is getting data from the BMS in every 100ms and storing in a register.
+									3)Battery related alarm are generated from these datas.
+									4)The alarms will attach to the status register and sending to Du with an intervel of 1s.
+									5)Along with the status register batterry percentage also sending to DU.
+Self Diagnostics:
+									1)1)All read register can access by the DU by sending queries.
+									
+
+Modifications _DU_Board
+====================================================================

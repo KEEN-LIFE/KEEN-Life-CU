@@ -1,0 +1,74 @@
+/*! \file **********************************************************************
+ *
+ *  \brief 
+ *
+ 
+ *  \author 
+ *
+ *  Copyright (c) 2021 CT Control Technology .
+ ******************************************************************************/
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include "PRVC.h"
+
+
+
+//---[ Macros ]-----------------------------------------------------------------
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+
+//---[ Private Functions ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+uint8_t VCV_breath=0;
+float Vol_error=0;
+//---[ Private Function Definitions ]-------------------------------------------
+
+void PRVC(void)
+{
+
+	//breath by breath corection
+	if(VCV_breath >=4 && !ulExhalationFlag  && !ulInhalationFlag)
+	{
+		Vol_error = ctrlWriteRead.Set_TidalVol - Insp_Tidal_vol;
+		if(Vol_error > 10)
+		{
+			ctrlWriteRead.Set_Insp_Pressure += (Vol_error/(1*P_compliance));
+			ctrlWriteParam.Set_Insp_Pressure += (Vol_error/(*P_compliance));
+		}
+		else if(Vol_error < -10)
+		{
+			ctrlWriteRead.Set_Insp_Pressure += (Vol_error/(5*P_compliance));
+			ctrlWriteParam.Set_Insp_Pressure += (Vol_error/(5*P_compliance));
+
+		}
+	}
+	
+	if(VCV_breath < 2)
+	{
+		VolCtrl_Algorithm();
+		ctrlWriteRead.Set_Insp_Pressure=ventAlgParam.Pplatue-ctrlWriteRead.Set_PEEP;
+		ctrlWriteParam.Set_Insp_Pressure=ventAlgParam.Pplatue-ctrlWriteRead.Set_PEEP;
+	}
+	else
+	{
+		ventAlgorithmSettings.ulTotalBreathTime = ((float)(60/ctrlWriteRead.Set_RespRate) * 1000);
+		ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulTotalBreathTime * ctrlWriteRead.Set_IE_Ratio/(1+ctrlWriteRead.Set_IE_Ratio); 
+		ventAlgorithmSettings.ulExhalationTime = ventAlgorithmSettings.ulTotalBreathTime - ventAlgorithmSettings.ulInhalationTime;
+		ventAlgorithmSettings.ulRiseTime = (ctrlWriteRead.Set_RiseTime * ventAlgorithmSettings.ulInhalationTime) / 100; 		
+		
+		PressureCtrl_Algorithm();
+	}
+		
+	ctrlWriteRead.Set_Pmax=0; //cheking pressure limits
+	
+	if(VCV_breath>100)VCV_breath=4;
+	
+}

@@ -1,0 +1,104 @@
+#ifndef _FM3164_MEMORY_H_
+#define _FM3164_MEMORY_H_
+
+/*! \file ********************************************************************
+ * \file FM3164_FRAM.h
+ *
+ *  \brief 
+ *
+ *  \author 
+ *
+ *  Copyright (c) 2021 CT Control Technology .
+ ********************************************************************/
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "i2c.h"
+#include "rom.h"
+
+//---[ Macros ]---------------------------------------------------------------
+
+#define MEMORY_SLAVE_ADDRESS				    0x50
+#define FRAM_MEM_READ								    0x0A
+#define FRAM_MEM_WRITE							    0x0B
+
+#define CONFIG_SET_FLAG		0x55
+#define ZERO_SET_FLAG			0x01
+#define CALIB_SET_FLAG		0xF1
+
+//---[ Types ]------------------------------------------------------------------ 
+
+typedef enum
+{
+    MEM_SET_GET_OK       = 0x00,
+    MEM_SET_GET_I2C_BUS_ERR = 0x01
+}memSetGetStatus; 
+
+typedef enum
+{
+    FACTORY_GET_PARAM_OK       = 0x00,
+    FACTORY_GET_PARAM_NOT_OK   = 0x01
+}factoryGetParamStatus;
+
+typedef enum
+{
+    GET_STORED_SETTINGS_OK       = 0x00,
+    GET_STORED_SETTINGS_NOT_OK   = 0x01
+}getStoredsettingsStatus;
+
+typedef struct _FRAM_memoryInfo
+{
+    uint32_t i2c_base;
+	  volatile uint32_t err_status;
+    uint8_t local_addrss_MSB;
+	  uint8_t local_addrss_LSB;
+	  uint32_t index;
+ 	
+}FRAM_memoryInfo;
+
+typedef struct
+{
+	float State;
+	float VentMode;
+	uint8_t Config_Set_Flag;
+	uint8_t Primary_Current;
+	uint8_t Signal_Frequency;
+	uint8_t ActiveProbLen;
+	uint8_t SpanOfProbe;
+	uint8_t HighTrigSet_Value;
+	uint8_t LowTrigSet_Value;
+	uint8_t Hysteresis;
+	uint8_t HighTrigSet;
+	uint8_t LowTrigSet;
+	uint8_t ZeroSetFlag;
+	uint8_t CalibSetFlag;
+	uint8_t Zero_set_Voltge;
+	uint8_t SecUnderVolt;
+	uint8_t SecOverVolt;
+	float VoltageChangePerMm;
+	uint8_t SystemPassword[7];
+	
+}SystemParameters;
+
+//---[ Public Variables ]-------------------------------------------------------
+
+extern FRAM_memoryInfo fRAM;
+extern SystemParameters sysParam;
+extern SystemParameters userParam;
+
+
+//---[ Private Functions ]---------------------------------------------
+
+//---[ Public Function Prototypes ]---------------------------------------------
+
+memSetGetStatus Mem_Set_Get_Parm_Func(FRAM_memoryInfo *,uint32_t,uint32_t,uint8_t *,uint32_t);
+factoryGetParamStatus Factory_Get_Param_values(SystemParameters *,uint32_t,uint8_t *);
+getStoredsettingsStatus Get_Stored_Settings(void);
+void Factory_Def_Values(SystemParameters*);
+void	FRAM_Test(void);
+void FRAM_DataAcqusition(void);
+
+#endif

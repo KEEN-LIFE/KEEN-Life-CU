@@ -1,0 +1,147 @@
+/*! \file **********************************************************************
+ *
+ *  \brief 
+ *
+ 
+ *  \author 
+ *
+ *  Copyright (c) 2021 CT Control Technology .
+ ******************************************************************************/
+	/*
+	give time trriggered breath at the starting of the ventilation.
+	the time triggered breath is with total breath time of simv_period.
+	start checking for the patient trigger in the rest of the time.
+	ie,sponataneous breath time = 60/set rr  - simv_period.
+	if patient effort detected within that time, pressure support ventilation will provide.
+	if spontaneous period is over then for the detected patient effort will cover by assist ventilation.
+	steps:
+		1--Read type of SIMV(VCV/PCV)
+	     if VCV:Read required parameters
+	            if Ti is there then SIMV period will calculated as with 1:2 ration of total breath time
+							else Read SIMV period from the user
+		2--Make all flags zero for starting ventilaion.
+		3--For this make success make two inhhalation part with time counter
+		4--First part is for mandatory or assit breath and pressure support mode breath.
+		5--No exhalation part only ending of simv cycle.
+	*/
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include "simv.h"
+
+
+
+//---[ Macros ]-----------------------------------------------------------------
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+
+//---[ Private Functions ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+uint32_t ulSimvperiodcounter,ulSpontperiodcounter;
+uint8_t  ulSimvperiodflag=0,ulSpontperiodflag=0,patienttriggerflag=0,simvpcntflag=0,firstbreath=0,simvpcntflag_1=0;
+//---[ Private Function Definitions ]-------------------------------------------
+void simv(void)
+{
+	
+	if(ulSimvperiodflag==0 && ulSpontperiodflag==0)//starting of simv cycle
+	{
+		ulSimvperiodflag=1;
+		if(firstbreath==0)
+			patienttriggerflag=1;
+		else
+			patienttriggerflag=0;
+		simvpcntflag=0;
+		simvpcntflag_1=0;
+		firstbreath=1;
+	}
+	if(ulSimvperiodflag==1)     // simv period 
+	{
+		if(ventAlgParam.PatientTriggerWindow==1 && simvpcntflag_1==0 && firstbreath==1)//checking for patient trigger
+		{
+			patienttriggerflag=1;
+			ulSimvperiodcounter=0;
+			ulExhalationCounter=0;
+			ulExhalationFlag=0;
+			simvpcntflag=0;
+			simvpcntflag_1=1;
+			 ventAlgParam.PatientTriggerWindow=0;
+		}
+		if((ulSimvperiodcounter > 0.9*ventAlgorithmSettings.simv_period) && patienttriggerflag !=1)
+		{
+			patienttriggerflag=1;
+			ulSimvperiodcounter=0;
+			ulExhalationCounter=0;
+			ulExhalationFlag=0;
+			ulInhalationCounter=0;
+			ulInhalationFlag=0;
+			simvpcntflag=0;
+			
+		}
+		if(ulExhalationFlag == 1)
+			simvpcntflag=1;
+		if(simvpcntflag==1)
+		{ulExhalationFlag=1;RC_Init=1;}
+		
+		
+		if(patienttriggerflag==1) //calling mandatory or assist breath
+		{
+			if(ctrlWriteParam.SIMV_mandatory ==1)
+			  VolCtrl_Algorithm();
+			else if(ctrlWriteParam.SIMV_mandatory==2)
+   			PressureCtrl_Algorithm();
+			simvpcntflag_1=1;
+		}
+
+		
+		if(ulSimvperiodcounter >= ventAlgorithmSettings.simv_period ) //end of simv counter
+		{
+			ulExhalationFlag=1;
+//			ulExhalationCounter=0;
+			ulSpontperiodflag=1;
+			ulSimvperiodflag=0;
+			patienttriggerflag=0;
+			ulSimvperiodcounter=0;
+			ulInhalationCounter=0;
+			ulInhalationFlag=0;
+			simvpcntflag=0;
+		}
+	}
+	if(ulSpontperiodflag==1)  //spontaneous period
+	{
+//			if(ulExhalationFlag==0)
+//				patienttriggerflag=0;
+			if(ventAlgParam.PatientTriggerWindow==1 && ulSpontperiodcounter < 0.9*ventAlgorithmSettings.spont_period) //checking for patient trigger
+			{
+				patienttriggerflag=1;
+				ulInhalationCounter=0;
+			  ulInhalationFlag=0;
+			}
+				
+			if(patienttriggerflag==1 ) //checking for spontaneous breath
+			{
+				pressuresupport();
+				ventAlgParam.PatientTriggerWindow=0;
+			}	
+		
+		if(ulSpontperiodcounter >= ventAlgorithmSettings.spont_period && !ulInhalationFlag) //end of spontaneous counter
+		{
+			patienttriggerflag=0;
+			ulSpontperiodcounter=0;
+			ulSpontperiodflag=0;
+//			ulExhalationFlag=0;
+//			ulExhalationCounter=0; //make ulExhalationFlag zero for detecting patient effort in simv period
+
+		}
+	
+  }
+	
+	if(ctrlReadParam.Insp_Pressure < 1.5)
+	{	uint8_t gh=1;}
+	
+}

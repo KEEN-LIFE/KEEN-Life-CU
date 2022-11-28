@@ -1,0 +1,771 @@
+/*! \file **********************************************************************
+ *
+ *  \brief 
+ *
+ 
+ *  \author 
+ *
+ *  Copyright (c) 2021 CT Control Technology .
+ ******************************************************************************/
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include "VentAlgorithm_Handler.h"
+
+//---[ Macros ]-----------------------------------------------------------------
+
+
+//---[ Constants ]--------------------------------------------------------------
+
+
+//---[ Types ]------------------------------------------------------------------
+
+
+//---[ Private Functions ]------------------------------------------------------
+
+
+//---[ Public Variables ]-------------------------------------------------------
+
+uint8_t VC_Alg = 0, PC_Alg = 0, ExhDAC_Flag = 0;
+float InhalCount = 0, ExhalCount = 0, PauseCount = 0,Exh_DACVal1 = 0;
+
+float Bias_flow=0,trigger_dac=0,Flow=0,Volume_comp=0,Flow_trigger_offset=0;//test variable 301021 tomin
+
+//PC mode Variale
+// float PC_Error=0,PC_Flow=0,PC_slope=0,P_peak=100,Pre_F=0,avg_DAC[10]={0},avg_DAC_value;
+uint16_t dac_i=0,avg_DAC_Index=0; //
+float pressure_flow=0;
+float P_PID_AVG[20]={0},E_PID_AVG[20]={10},P_AVG=0,E_AVG=0;
+uint16_t P_AVG_INDEX=0,E_AVG_INDEX=0;
+float P_peak=0,chk_compliance=0;;
+float rise_time_var=2;
+uint32_t BREATH_CNT=0;
+float  rise_error=0;
+uint16_t rise_error_f=0;
+uint8_t RISE_FLAG=0,simv_pc_ps=0;
+float pressure_max_flow=0;
+float check_pressure[2]={15,15},diff_pressure[2]={0,0};
+
+
+//exhalation valve variables
+float Exh_Error=0,Exh_Error_1=0,Exh_Error_2=0,Exh_DACVal_1=0,Exh_DACVal_0=0;
+float	E_K=100,E_Ts=10,E_Ti=15,E_Td=0.1,E_Error=0,E_Error_1=0,DAC_out=0,E_PropTerm=0,E_IntegralTerm=0;
+float dac=0;
+
+uint8_t peep_delay=0;
+//tomin added 200122
+float	P_Error_1=0,P_Error_2=0,Flow_out_1=0,Flow_out=0,UL_Airflow=0,UL_O2flow=0;
+float P_K=0.2,Ti=0.035,Ts=0.02,Td=0.04;
+float measurement = 0,PEF=0,PCM_re=0,Pre_Peak=0,Pre_PCM_re,s_INSP_Pressure=0,re_50=0,ps_INSP_Pressure=0;
+float avg_pre=0,AVG_PRESSURE=0,pre_point=0,pre_poit_2=0,pre_rise=200,P_pre_rise=200;
+uint16_t pre_rise_f=0,corr_f=0,corr_f_chk=0;
+
+float open_time[3]={300.0,150.0,50.0};
+float DAC[4]={0};
+uint16_t ot_index=0,co_index=0,k_index=0;	
+
+//compliance calculation
+float Tid_Vol=0,flow=0,p_flow=0,delta_pressure[2]={0,0},compliance=10,Resistance=0,Resistance_C=50,P_Resistance=0,P_compliance=50;
+float Insp_Tidal_vol=0,open_per=0.8,Insp_Tidal_vol_A=0;
+float PEEP[4]={0},AVG_PEEP=0,AVG_ERROR=0,SET_PEEP=0,AVG_PEEP_ACC=0,AVG_CNT=0;
+uint8_t  peep_f=0,patient_F=0;
+uint32_t peep_error=0,peep_cnt[4]={0};
+int trigger_time=0,fl_tri_flag=0;
+float Max_E_Tidal_vol=0, Volume_read=0 ;
+
+
+//flow conntrol loop extra defined variables
+float F_Error[2]={0,0},F_Error_1[2]={0,0},F_Error_2[2]={0,0},
+F_PropTerm=0,F_IntegralTerm=0,F_DeriveTerm=0,F_DAC_out[2]={0,0},F_DAC_out_1[2]={0,0};
+float F_K=0.07,F_Ts=0.005,F_Ti=0.01,F_Td=0;
+	
+//testing variables
+float check[110]={0};
+uint16_t c_k=0;
+
+//---[ Private Function Definitions ]-------------------------------------------
+void Vent_Algorithm(void)
+{
+	uint32_t VentMode;
+	
+	VentMode = (uint32_t)ctrlWriteRead.Vent_Mode;
+
+	switch(VentMode)
+	{
+			case VOL_CTRL_MODE: 
+											VolCtrl_Algorithm();
+											break;
+			
+			case PRESSURE_CTRL_MODE:
+											PressureCtrl_Algorithm();
+											break;	
+			
+			case PRESSURESUPPORT:
+											pressuresupport();
+											break;
+			case SIMV:
+											simv();
+											break;
+			
+			case PRVC_:
+											PRVC();
+											break;
+			
+			case NIV :
+											NIV_Algorithm();
+											break;
+											
+			default :
+											break;		
+		 
+	}
+}
+
+void VentAlgorithmSettings(void)
+{
+	uint32_t VentMode;
+	
+	VentMode = (uint32_t)ctrlWriteParam.Vent_Mode;
+	
+	if(VentRunFlag == 0)
+	
+	 {
+		 
+		if(VentMode == VOL_CTRL_MODE)
+		{
+			ctrlWriteParam.Vent_Mode = 1;
+			ctrlWriteParam.Set_PEEP = 5;
+			ctrlWriteParam.Set_RespRate = 15;
+			ctrlWriteParam.Set_TidalVol = 400;
+			Volume_comp=ctrlWriteParam.Set_TidalVol ;
+			ctrlWriteParam.Set_PauseTime = 10;
+			ctrlWriteParam.Set_RiseTime = 10; 
+			ctrlWriteParam.Set_Pmax = 20;
+			ctrlWriteParam.Set_FI02 = 21;
+			ctrlWriteParam.Set_InspTime=1;
+			ctrlWriteParam.Set_IE_Ratio = 0.5;
+			ctrlWriteParam.Flow_TrigSenstvty = 2;
+			ctrlWriteParam.Pres_TrigSenstvty = 2;		
+			ctrlWriteParam.Apnea_Time=10;
+		}	
+		
+	 if(VentMode == PRESSURE_CTRL_MODE)
+		{
+			ctrlWriteParam.Vent_Mode = 2;
+			ctrlWriteParam.Set_PEEP = 5;
+			ctrlWriteParam.Set_RespRate =16;
+			ctrlWriteParam.Set_RiseTime = 25; 
+			ctrlWriteParam.Set_Insp_Pressure = 10; 
+			ctrlWriteParam.Set_FI02 = 21;
+			ctrlWriteParam.Set_InspTime=1;
+			ctrlWriteParam.Set_IE_Ratio = 0.5;
+			ctrlWriteParam.Flow_TrigSenstvty = 3;
+			ctrlWriteParam.Pres_TrigSenstvty = 1;	
+			s_INSP_Pressure=(ctrlWriteParam.Set_Insp_Pressure+ctrlWriteParam.Set_PEEP);
+			ctrlWriteParam.Apnea_Time=10;
+
+
+		}
+		if(VentMode == PRESSURESUPPORT)
+		{
+			ctrlWriteParam.Vent_Mode = 3;
+			ctrlWriteParam.Set_PEEP = 10;
+			ctrlWriteParam.Set_RiseTime = 10; 
+			ctrlWriteParam.Set_pressuresupport = 10; 
+			ctrlWriteParam.Set_FI02 = 21;
+			ctrlWriteParam.Flow_Exp_trigger=10;
+			ctrlWriteParam.Flow_TrigSenstvty = 3;
+			ctrlWriteParam.Pres_TrigSenstvty = 1;	
+			ps_INSP_Pressure=(ctrlWriteParam.Set_pressuresupport+ctrlWriteParam.Set_PEEP);
+			ctrlWriteParam.Apnea_Time=10;
+
+		}	
+		if(VentMode == PRVC_)
+		{
+			ctrlWriteParam.Vent_Mode = 5;
+			ctrlWriteParam.Set_PEEP = 5;
+			ctrlWriteParam.Set_RespRate =15;
+			ctrlWriteParam.Set_RiseTime = 10; 
+			ctrlWriteParam.Set_PauseTime=10;
+			ctrlWriteParam.Set_TidalVol = 400; 
+			ctrlWriteParam.Set_FI02 = 21;
+			ctrlWriteParam.Set_IE_Ratio = 0.5;
+			ctrlWriteParam.Flow_TrigSenstvty = 3;
+			ctrlWriteParam.Pres_TrigSenstvty = 1;	
+			ctrlWriteParam.Set_Pmax=30;
+
+		}	
+		
+		if(VentMode == SIMV)
+		{
+			ctrlWriteParam.Vent_Mode = 4;
+			ctrlWriteParam.Set_PEEP = 5;
+			ctrlWriteParam.Set_RespRate =6;
+	 		ctrlWriteParam.Set_RiseTime = 30;
+			ctrlWriteParam.breath_cycle=3;
+			ctrlWriteParam.Set_TidalVol = 500;
+			Volume_comp=ctrlWriteParam.Set_TidalVol ;
+			ctrlWriteParam.Set_PauseTime = 10;			
+			ctrlWriteParam.Set_Insp_Pressure = 20; 
+			ctrlWriteParam.Set_pressuresupport=15;
+			ctrlWriteParam.Flow_Exp_trigger=10;
+			ctrlWriteParam.SIMV_mandatory=1;
+			ctrlWriteParam.Set_FI02 = 21;
+			ctrlWriteParam.Set_IE_Ratio = 0.5;
+			ctrlWriteParam.Flow_TrigSenstvty = 3;
+			ctrlWriteParam.Pres_TrigSenstvty = 2;	
+			s_INSP_Pressure=(ctrlWriteParam.Set_Insp_Pressure+ctrlWriteParam.Set_PEEP);
+			ps_INSP_Pressure=(ctrlWriteParam.Set_pressuresupport+ctrlWriteParam.Set_PEEP);
+			ctrlWriteParam.Apnea_Time=10;
+
+		}
+		if(VentMode == NIV)
+		{
+			ctrlWriteParam.Vent_Mode = 3;
+			ctrlWriteParam.Set_PEEP = 5;
+			ctrlWriteParam.Set_RiseTime = 10; 
+			ctrlWriteParam.Set_pressuresupport = 10; 
+			ctrlWriteParam.Set_FI02 = 21;
+			ctrlWriteParam.Flow_Exp_trigger=10;
+			ctrlWriteParam.Flow_TrigSenstvty = 3;
+			ctrlWriteParam.Pres_TrigSenstvty = 1;	
+			ps_INSP_Pressure=(ctrlWriteParam.Set_pressuresupport+ctrlWriteParam.Set_PEEP);
+			ctrlWriteParam.Apnea_Time=10;
+
+		}	
+
+		ctrlWriteRead=ctrlWriteParam;
+		VentRunFlag = 1;
+		
+	}
+	
+	if(VentMode == VOL_CTRL_MODE)
+		{
+			ventAlgorithmSettings.ulTotalBreathTime = ((float)(60/ctrlWriteRead.Set_RespRate) * 1000);
+		  ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulTotalBreathTime * ctrlWriteRead.Set_IE_Ratio/(1+ctrlWriteRead.Set_IE_Ratio); 
+			ventAlgorithmSettings.ulExhalationTime = ventAlgorithmSettings.ulTotalBreathTime - ventAlgorithmSettings.ulInhalationTime;
+			ventAlgorithmSettings.ulPauseTime =  (ctrlWriteRead.Set_PauseTime * ventAlgorithmSettings.ulTotalBreathTime)/100; 
+			ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulInhalationTime - ventAlgorithmSettings.ulPauseTime;
+			ventAlgorithmSettings.ulRiseTime = (ctrlWriteRead.Set_RiseTime * ventAlgorithmSettings.ulInhalationTime) / 100; 
+			ventAlgorithmSettings.ulInhalationFlow = (ctrlWriteRead.Set_TidalVol/ventAlgorithmSettings.ulInhalationTime)*60;
+			ventAlgorithmSettings.ulAirFlow = ventAlgorithmSettings.ulInhalationFlow*(100-ctrlWriteRead.Set_FI02)/79;  	
+			ventAlgorithmSettings.ulO2Flow = ventAlgorithmSettings.ulInhalationFlow-ventAlgorithmSettings.ulAirFlow;
+		}
+	
+	if(VentMode == PRESSURE_CTRL_MODE)
+		{
+			ventAlgorithmSettings.ulTotalBreathTime = ((float)(60/ctrlWriteRead.Set_RespRate) * 1000);
+		  ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulTotalBreathTime * ctrlWriteRead.Set_IE_Ratio/(1+ctrlWriteRead.Set_IE_Ratio); 
+			ventAlgorithmSettings.ulExhalationTime = ventAlgorithmSettings.ulTotalBreathTime - ventAlgorithmSettings.ulInhalationTime;
+			ventAlgorithmSettings.ulRiseTime = (ctrlWriteRead.Set_RiseTime * ventAlgorithmSettings.ulInhalationTime) / 100; 		
+		}
+	if(VentMode == PRESSURESUPPORT)
+		{
+			ventAlgorithmSettings.ulInhalationTime=1000;//ctrlWriteRead.Set_InspTime*1000;
+			ventAlgorithmSettings.ulTotalBreathTime = ((float)(60/ctrlWriteRead.Set_RespRate) * 1000);
+			ventAlgorithmSettings.ulExhalationTime =2000;//ventAlgorithmSettings.ulTotalBreathTime - ventAlgorithmSettings.ulInhalationTime;
+		}
+		
+	if(VentMode == PRVC_)
+		{
+			ventAlgorithmSettings.ulInhalationTime=ctrlWriteRead.Set_InspTime*1000;
+			ventAlgorithmSettings.ulTotalBreathTime = ((float)(60/ctrlWriteRead.Set_RespRate) * 1000);
+		  ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulTotalBreathTime * ctrlWriteRead.Set_IE_Ratio/(1+ctrlWriteRead.Set_IE_Ratio); 
+			ventAlgorithmSettings.ulExhalationTime = ventAlgorithmSettings.ulTotalBreathTime - ventAlgorithmSettings.ulInhalationTime;
+			ventAlgorithmSettings.ulPauseTime =  (ctrlWriteRead.Set_PauseTime * ventAlgorithmSettings.ulTotalBreathTime)/100; 
+			ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulInhalationTime - ventAlgorithmSettings.ulPauseTime;
+			ventAlgorithmSettings.ulRiseTime = (ctrlWriteRead.Set_RiseTime * ventAlgorithmSettings.ulInhalationTime) / 100; 
+			ventAlgorithmSettings.ulInhalationFlow = (ctrlWriteRead.Set_TidalVol/ventAlgorithmSettings.ulInhalationTime)*60;
+			ventAlgorithmSettings.ulAirFlow = ventAlgorithmSettings.ulInhalationFlow*(100-ctrlWriteRead.Set_FI02)/79;  	
+			ventAlgorithmSettings.ulO2Flow = ventAlgorithmSettings.ulInhalationFlow-ventAlgorithmSettings.ulAirFlow;
+		}
+	
+		
+			if(VentMode == SIMV)
+		{
+			ventAlgorithmSettings.simv_RR=ctrlWriteRead.Set_RespRate;
+			ventAlgorithmSettings.simv_period=ctrlWriteRead.breath_cycle*1000;
+			ventAlgorithmSettings.spont_period=(60/ventAlgorithmSettings.simv_RR)*1000-ventAlgorithmSettings.simv_period;
+			ventAlgorithmSettings.ulTotalBreathTime = ctrlWriteRead.breath_cycle*1000;
+		  ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulTotalBreathTime * ctrlWriteRead.Set_IE_Ratio/(1+ctrlWriteRead.Set_IE_Ratio); 
+			ventAlgorithmSettings.ulExhalationTime = ventAlgorithmSettings.simv_period - ventAlgorithmSettings.ulInhalationTime;
+			if(ctrlWriteRead.SIMV_mandatory==1)
+			{
+				ventAlgorithmSettings.ulPauseTime =  (ctrlWriteRead.Set_PauseTime * ventAlgorithmSettings.simv_period)/100; 
+				ventAlgorithmSettings.ulInhalationTime = ventAlgorithmSettings.ulInhalationTime - ventAlgorithmSettings.ulPauseTime;
+			}
+			ventAlgorithmSettings.ulRiseTime = (ctrlWriteRead.Set_RiseTime * ventAlgorithmSettings.ulInhalationTime) / 100; 
+			ventAlgorithmSettings.ulInhalationFlow = (ctrlWriteRead.Set_TidalVol/ventAlgorithmSettings.ulInhalationTime)*60;
+			ventAlgorithmSettings.ulAirFlow = ventAlgorithmSettings.ulInhalationFlow*(100-ctrlWriteRead.Set_FI02)/79;  	
+			ventAlgorithmSettings.ulO2Flow=ventAlgorithmSettings.ulInhalationFlow - ventAlgorithmSettings.ulAirFlow;
+		}
+
+			if(VentMode == NIV)
+		{
+			ventAlgorithmSettings.ulInhalationTime=1000;//ctrlWriteRead.Set_InspTime*1000;
+			ventAlgorithmSettings.ulTotalBreathTime = ((float)(60/ctrlWriteRead.Set_RespRate) * 1000);
+			ventAlgorithmSettings.ulExhalationTime =2000;//ventAlgorithmSettings.ulTotalBreathTime - ventAlgorithmSettings.ulInhalationTime;
+		}
+
+		
+}
+
+void FlowControlLoop(uint32_t mode)
+{	
+	if(ctrlWriteRead.Vent_Mode == 1)
+	{	
+		flow_control();//Air and Oxygen mixing function
+	}
+	else if(ctrlWriteRead.Vent_Mode == 2)
+	{
+		PID_PressureControl_Loop(); // Pressure control PID function calling
+	}
+	else if(ctrlWriteRead.Vent_Mode == 3)
+	{
+		PID_PressureControl_Loop(); // Pressure control PID function calling
+	}
+	else if(ctrlWriteRead.Vent_Mode==4)
+	{
+		if(ulSimvperiodflag==1 && ulInhalationFlag == 1)
+		{
+				simv_pc_ps=1;
+			if(ctrlWriteRead.SIMV_mandatory==1)
+						flow_control();//Air and Oxygen mixing function	
+			else if(ctrlWriteRead.SIMV_mandatory==2)
+						PID_PressureControl_Loop(); // Pressure control PID function calling		
+		}
+		else if(ulSpontperiodflag==1 && ulInhalationFlag ==1)
+		{
+				simv_pc_ps=2;
+				PID_PressureControl_Loop(); // Pressure control PID function calling		
+		}
+	}
+	else if(ctrlWriteRead.Vent_Mode==5)
+	{
+		if(VCV_breath < 2)
+				flow_control();//Air and Oxygen mixing function
+		else
+			PID_PressureControl_Loop(); // Pressure control PID function calling
+	}
+	else if (ctrlWriteRead.Vent_Mode == 7)
+	{
+			PID_PressureControl_Loop(); // Pressure control PID function calling
+	}
+	
+		
+	
+	
+}
+void flow_control()
+{
+			if(ventAlgorithmSettings.ulAirFlow==0)
+			{
+//					ctrlReadParam.Air_Flow=0;
+//					F_Error[0]=0,F_Error_1[0]=0,F_Error_2[0]=0,F_DAC_out[0]=0,F_DAC_out_1[0]=0;
+			}
+			if(ventAlgorithmSettings.ulO2Flow==0)
+			{
+//		 			ctrlReadParam.O2_Flow=0;
+//			 		F_Error[1]=0,F_Error_1[1]=0,F_Error_2[1]=0,F_DAC_out[1]=0,F_DAC_out_1[1]=0;				
+			}
+	    F_Error[0] = ventAlgorithmSettings.ulAirFlow - ctrlReadParam.Air_Flow;
+			F_Error[1] = ventAlgorithmSettings.ulO2Flow - ctrlReadParam.O2_Flow;
+			
+	    
+			for(int f_index=0;f_index < 2;f_index++)
+			{
+				F_PropTerm = F_Error[f_index]-F_Error_1[f_index];
+				F_IntegralTerm = F_Ts/F_Ti*F_Error_1[f_index];	
+				F_DeriveTerm = F_Td/F_Ts*(F_Error[f_index]-2*F_Error_1[f_index]+F_Error_2[f_index]);
+				F_DAC_out[f_index] = F_DAC_out_1[f_index]+F_K*(F_PropTerm+F_IntegralTerm+F_DeriveTerm);	
+				F_Error_1[f_index] = F_Error[f_index];
+				F_Error_2[f_index] = F_Error_1[f_index];
+				F_DAC_out_1[f_index] = F_DAC_out[f_index];
+				
+				if(F_DAC_out_1[f_index] > 110)F_DAC_out_1[f_index]=0;
+			}
+			
+				
+			ventAlgParam.ulPVValueAir=Air_Flow_calc(F_DAC_out[0]);	
+			ventAlgParam.ulPVValueO2=O2_Flow_calc(F_DAC_out[1]);
+			
+		
+			DAC_Output_Set(&DAC1,DAC_CHANNEL_1,ventAlgParam.ulPVValueAir,LTC2607_WR_AND_UPDATE); // AIR PV SET Function
+	    DAC_Output_Set(&DAC1,DAC_CHANNEL_2,ventAlgParam.ulPVValueO2,LTC2607_WR_AND_UPDATE); // O2 PV SET Function
+
+}
+float Air_Flow_calc(signed error)
+{
+	float flow = (signed) error,error_DAC;
+
+	if((flow > sysParam.Air_PV_Valve_limits[0]) && (flow<= sysParam.Air_PV_Valve_limits[1]))
+	{	
+		 error_DAC = sysParam.Air_PV_Valve[0]*pow(flow,4)+ sysParam.Air_PV_Valve[1]*pow(flow,3) +sysParam.Air_PV_Valve[2]*pow(flow,2) + sysParam.Air_PV_Valve[3]*flow + sysParam.Air_PV_Valve[4];
+	}
+	else if((flow > sysParam.Air_PV_Valve_limits[1]) && (flow<= sysParam.Air_PV_Valve_limits[2]))
+	{
+		error_DAC = sysParam.Air_PV_Valve[5]*pow(flow,3) + sysParam.Air_PV_Valve[6]*pow(flow,2) + sysParam.Air_PV_Valve[7]*flow + sysParam.Air_PV_Valve[8];	
+	}
+	else if((flow > sysParam.Air_PV_Valve_limits[2] ) && (flow<= sysParam.Air_PV_Valve_limits[3]))
+	{
+		error_DAC = sysParam.Air_PV_Valve[9]*pow(flow,2) + sysParam.Air_PV_Valve[10]*flow + sysParam.Air_PV_Valve[11] ;	
+	}
+		else if((flow > sysParam.Air_PV_Valve_limits[3] ) && (flow <= sysParam.Air_PV_Valve_limits[4]))
+	{
+		error_DAC =sysParam.Air_PV_Valve[12]*pow(flow,2) + sysParam.Air_PV_Valve[13]*flow + sysParam.Air_PV_Valve[14] ;	
+	}
+	else if (flow>=sysParam.Air_PV_Valve_limits[4])		
+		error_DAC=25000;
+	else
+		 error_DAC=0;
+	
+	return error_DAC;
+}
+
+float O2_Flow_calc(signed error)
+{
+	float flow = (signed) error,error_DAC_O=0;
+	
+	if((flow >= sysParam.O2_PV_Valve_limits[0]) && (flow<= sysParam.O2_PV_Valve_limits[1]))	
+	{
+		error_DAC_O = sysParam.O2_PV_Valve[0]*pow(flow,4) + sysParam.O2_PV_Valve[1]*pow(flow,3) + sysParam.O2_PV_Valve[2]*pow(flow,2) + sysParam.O2_PV_Valve[3]*flow + sysParam.O2_PV_Valve[4];		
+	}
+	else if((flow > sysParam.O2_PV_Valve_limits[1]) && (flow<= sysParam.O2_PV_Valve_limits[2]))
+	{
+		error_DAC_O = sysParam.O2_PV_Valve[5]*pow(flow,3) + sysParam.O2_PV_Valve[6]*pow(flow,2) + sysParam.O2_PV_Valve[7]*flow + sysParam.O2_PV_Valve[8];
+	}
+	else if((flow > sysParam.O2_PV_Valve_limits[2]) && (flow<= sysParam.O2_PV_Valve_limits[3]))
+	{
+		error_DAC_O = sysParam.O2_PV_Valve[9]*pow(flow,3) + sysParam.O2_PV_Valve[10]*pow(flow,2) + sysParam.O2_PV_Valve[11]*flow + sysParam.O2_PV_Valve[12];		
+	}
+	else if (flow>sysParam.O2_PV_Valve_limits[3])
+	{	
+		error_DAC_O=25000;
+	}
+	else
+		 error_DAC_O=0;
+	
+	return error_DAC_O;	
+}
+
+void PID_PressureControl_Loop()
+{	
+	if (simv_pc_ps == 1 || ctrlWriteRead.Vent_Mode == 2 || ctrlWriteRead.Vent_Mode == 5)
+		P_Error = (s_INSP_Pressure- ctrlReadParam.Insp_Pressure); // Pressure Error calculation for PC mode
+
+	else if (simv_pc_ps == 2 || ctrlWriteRead.Vent_Mode == 3)
+		P_Error = (ps_INSP_Pressure - ctrlReadParam.Insp_Pressure); //// Pressure Error calculation for PS mode
+
+	
+//	if(chk_compliance > (P_compliance+P_compliance *25) && 
+//		chk_compliance < (P_compliance-P_compliance *25))
+//		BREATH_CNT=0;
+//	
+//	if(BREATH_CNT <= 2 )
+//	 {
+//			rise_time_var=-0.0312*P_compliance + 2.6308;
+//	 }
+//	 chk_compliance=P_compliance;
+//	 
+//	if(5.Vent_Mode==2)// rise time implementatio only for pressure control mode
+//	if(s_INSP_Pressure*0.9 > ctrlReadParam.Insp_Pressure && RISE_FLAG == 0)
+//	{
+//		 P_Error=P_Error*rise_time_var;
+//		if(BREATH_CNT > 2 && rise_error_f==0)
+//		{
+//		  rise_error=(ventAlgorithmSettings.ulRiseTime - P_pre_rise);
+//			
+//			if((rise_error>0?rise_error:rise_error*-1) > 40)				
+//			  rise_time_var-=(rise_error/500);
+//			rise_error_f=1;	
+//		}
+//	}
+	
+	P_PropTerm = P_Error-P_Error_1;
+	
+	P_IntegralTerm = Ts/Ti*P_Error;	
+	
+	P_DeriveTerm = Td/Ts*(P_Error-2*P_Error_1+P_Error_2);
+	
+	Flow_out =Flow_out_1+P_K*(P_PropTerm+P_IntegralTerm+P_DeriveTerm);
+	
+	P_Error_1=P_Error;
+	
+	P_Error_2=P_Error_1;
+		
+	if(BREATH_CNT > 100)
+		BREATH_CNT=4;
+	
+	Flow_out_1=Flow_out;				// Flow required for maintaining pressure - update on every 10ms
+	
+	UL_Airflow= Flow_out*(100-ctrlWriteRead.Set_FI02)/79;  	// O2 flow calculation
+	UL_O2flow	= Flow_out-UL_Airflow;			// Air flow calculation
+ 
+	
+	ventAlgParam.ulPVValueAir=Air_Flow_calc(UL_Airflow);				// Air PV DAC value
+	ventAlgParam.ulPVValueO2=O2_Flow_calc(UL_O2flow);					// O2 PV DAC value
+		   
+	DAC_Output_Set(&DAC1,DAC_CHANNEL_2,ventAlgParam.ulPVValueO2,LTC2607_WR_AND_UPDATE);  // O2 PV SET Function
+	DAC_Output_Set(&DAC1,DAC_CHANNEL_1,ventAlgParam.ulPVValueAir,LTC2607_WR_AND_UPDATE); // AIR PV SET Function	
+
+ }
+void pressure_autocorr()
+{
+				float k_const=0.0,int_time=0.0,sam_time=0.0,di_time=0.0;
+		    avg_pre=avg_pre;
+				float corr_pressure=0;
+				if(ulSimvperiodflag==1 || ctrlWriteRead.Vent_Mode==2 || ctrlWriteRead.Vent_Mode==5)
+					corr_pressure=check_pressure[0];
+				else if(ulSpontperiodflag==1 ||ctrlWriteRead.Vent_Mode==3 || ctrlWriteRead.Vent_Mode==7)
+					corr_pressure=check_pressure[1];
+				
+//Set pressure correction according to the complaince
+				if(P_compliance <= 15)
+				{
+					s_INSP_Pressure = corr_pressure* 0.8768 ;//- 1.2402;
+					ps_INSP_Pressure = corr_pressure* 0.8768 ;
+				}
+				else if(P_compliance >15 && P_compliance <=35)
+				{
+					s_INSP_Pressure = corr_pressure* 0.8749 + 0.8885;
+					ps_INSP_Pressure = corr_pressure* 0.8749 + 0.8885;
+
+				}
+				else if(P_compliance >35)
+				{
+					
+					s_INSP_Pressure = corr_pressure* 0.9534 - 0.6816;
+					ps_INSP_Pressure = corr_pressure* 0.9534 - 0.6816;
+
+				}
+//checking table for the PID coefficients
+	 				if(Resistance < 15)
+				{
+					  k_const =  1.2;//-0.03*corr_pressure + 1.45;		
+						int_time=0.035;
+						sam_time=0.02;
+						di_time=0.12;
+					if(P_compliance >15 && P_compliance <= 35)
+					{
+						s_INSP_Pressure = s_INSP_Pressure* 1.1069 - 3.7102;
+						ps_INSP_Pressure = ps_INSP_Pressure* 1.1069 - 3.7102;
+					}
+						corr_f=1;
+				}
+				else if(Resistance >= 15 && Resistance <=21)
+				{			
+						k_const =0.001*pow(corr_pressure,2) - 0.08*corr_pressure + 2.1; //change of k coefficient with respect to set inspiratorry pressre
+						int_time=0.04;
+						sam_time=0.021;
+						di_time=0.1;
+					if(P_compliance > 35 )
+					{
+						s_INSP_Pressure = s_INSP_Pressure* 0.9712 + 1.3112;
+						ps_INSP_Pressure = ps_INSP_Pressure* 0.9712 + 1.3112;
+					}
+						corr_f=2;
+				}
+				else if(Resistance > 21)
+				{	
+						k_const=0.45;//-0.003*corr_pressure + 0.24;
+						int_time=0.06;
+						sam_time=0.02;
+						di_time=0.1;
+						corr_f=3;
+				}
+				
+				P_K=k_const,Ti=int_time,Ts=sam_time,Td=di_time;          //setting PID coefficients		
+				  
+//				P_K=0.1,Ti=0.035,Ts=0.02,Td=0; //R5C50
+			}
+ 
+void FlowTrigger()
+{						
+	
+		Bias_flow=5.5;
+		trigger_dac= Air_Flow_calc(Bias_flow);					
+		DAC_Output_Set(&DAC1,DAC_CHANNEL_1,trigger_dac,LTC2607_WR_AND_UPDATE); // AIR PV SET Function
+		RC_TimeInit = 1;
+				
+			if(RC_TimeCount >= RC_Time*5)  
+			{				
+					ventAlgParam.FlowTrigger =  ctrlReadParam.Total_Flow - EXH_FLOW;														
+				
+					if(ventAlgParam.FlowTrigger >= ctrlWriteRead.Flow_TrigSenstvty)
+					{ 					
+						DAC_Output_Set(&DAC1,DAC_CHANNEL_1,0,LTC2607_WR_AND_UPDATE); // AIR PV SET Function					
+						ventAlgParam.PatientTriggerWindow=1;
+						ulExhalationFlag = 0;
+						ulExhalationCounter = 0;
+						RC_TimeInit=0;
+						RC_TimeCount=0;
+						RC_Init=0;
+						RC_ConstCount=0;
+						Backup_init=0;
+						Backup_wait=0;
+						Tech_Alarmcheck.apnea_ventilation=0;
+						apneaalarm_flag=0;  //clearing apnea alarm when patient effort is detected.
+						apneacount_flag=0;	//clearing apnea time flag
+						apneacount_time=0;	//clearing apnea counter
+						Flow_trigger_offset=0;
+						VCV_breath++;   //for prvc
+					}
+	}
+	}																	
+void PressureTrigger()
+	{		
+		
+		if(ctrlReadParam.Insp_Pressure <= (ctrlWriteRead.Set_PEEP+2))
+		{
+			Backup_init=1;
+
+					if(ctrlReadParam.Insp_Pressure <= ((ctrlWriteRead.Set_PEEP) - ctrlWriteRead.Pres_TrigSenstvty))
+					{
+						ventAlgParam.PatientTriggerWindow = 1;
+						ulExhalationFlag = 0;
+						ulExhalationCounter = 0;
+						if(ulSpontperiodflag==1)
+							patienttriggerflag=0;
+						RC_Init=0;
+						RC_ConstCount=0;
+						Backup_init=0;
+						Backup_wait=0;
+						apneaalarm_flag=0;  //clearing apnea alarm when patient effort is detected.
+						Tech_Alarmcheck.apnea_ventilation=0;
+						apneacount_flag=0;	//clearing apnea time flag
+						apneacount_time=0;	//clearing apnea counter
+						VCV_breath++; //for prvc
+					}
+			}
+	}
+
+void RiseTime_Acquisition(uint32_t *DAC_Val)
+{
+			 if(ctrlReadParam.Insp_Pressure <= 35)
+			 {
+//				if(RiseTimeEnabled == 0)
+//				{
+					Time100mS_Init = 1;
+//					RiseTimeEnabled = 1;
+//				}					
+				DAC_Output_Set(&DAC1,DAC_CHANNEL_1,*DAC_Val,LTC2607_WR_AND_UPDATE); // AIR PV SET Function
+				DAC_Output_Set(&DAC2,DAC_CHANNEL_1,20000,LTC2607_WR_AND_UPDATE);   // Exhal Valve Closed
+				*DAC_Val+=200;
+				 
+			 }	
+			 else
+			 {
+				 *DAC_Val = 0;
+			 }
+}
+
+void RiseTime_FlowCtrl(uint32_t *DAC_Val)
+{ 			
+//	*DAC_Val+=200;
+
+				if(Time100mS_Count >= 100)
+				{	
+					Modbus_Service_MessageTx(); 
+					DAC_Output_Set(&DAC1,DAC_CHANNEL_1,0,LTC2607_WR_AND_UPDATE); // AIR PV SET Function
+					DAC_Output_Set(&DAC2,DAC_CHANNEL_1,0,LTC2607_WR_AND_UPDATE);   // Exhal Valve
+//					*DAC_Val = 800;
+					Time100mS_Init = 0;
+					Time100mS_Count = 0;
+				}
+				
+}
+
+
+
+void comp_calculation()
+{
+	flow=ctrlReadParam.Exh_Flow - ctrlReadParam.Total_Flow;
+		Tid_Vol=Tid_Vol+flow*0.01*1000/60;
+	if(Tid_Vol > 0.63*Insp_Tidal_vol && Volume_read == 0)
+	{		
+		if(Tid_Vol > Max_E_Tidal_vol)  //finding rise in the volume
+			Max_E_Tidal_vol=Tid_Vol;
+		
+		else
+			Volume_read=1;
+	}
+
+	compliance=Tid_Vol/(ventAlgParam.Pplatue - ctrlReadParam.Insp_Pressure);
+}
+
+
+void PEEP_control()
+{
+				
+	if(Peep_Flag != 1 )                                //checking once in a breath
+	{	
+		
+		Res_Init=1; // for  resistance calculation counter	
+		
+		ventAlgParam.Pplatue=ctrlReadParam.Insp_Pressure;
+		
+		AVG_PEEP = AVG_PEEP_ACC/AVG_CNT;										//calculating average peep value
+		
+		E_Error = SET_PEEP - AVG_PEEP;											//measuring peep error
+		
+		AVG_ERROR = fabs(E_Error);
+		
+		Exh_DACVal_0 = Exh_DACVal_1;
+		
+		if(peep_error == 0 || SET_PEEP != ctrlWriteRead.Set_PEEP )  //only for first breath or whwn change in set peep
+		{
+			Exh_DACVal_1=sysParam.DAC_Peep[0]*ctrlWriteRead.Set_PEEP + sysParam.DAC_Peep[1]; //UPDATED ON 06-04-2022   //Dac vs PEEP curve
+			Exh_DACVal_0=sysParam.DAC_Peep[0]*ctrlWriteRead.Set_PEEP + sysParam.DAC_Peep[1]; //UPDATED ON 06-04-2022		// Copying dac vs PEEP curve for re-entring 
+			SET_PEEP=ctrlWriteRead.Set_PEEP;
+		}
+		
+		else 	if(AVG_ERROR > SET_PEEP*0.05)			//Breath to breath correction
+		{
+			E_Error /= 2;
+			
+			Exh_DACVal_1 = Exh_DACVal_1 + E_Error * sysParam.DAC_Peep[0];     
+		}
+		
+//		AVG_PEEP=0;
+		AVG_PEEP_ACC=0;
+		AVG_CNT=0;
+		Peep_Flag=1; 
+		peep_error++;
+	}	
+	
+	if(Tid_Vol  <=  Insp_Tidal_vol*0.8 && peep_delay==0)				//opening time of exhalation valve ckecking
+	{				 
+			DAC_Output_Set(&DAC2,DAC_CHANNEL_1,0,LTC2607_WR_AND_UPDATE);   //make exh. valve fully open
+			peep_delay=1;																									 //make sure that entered only once in a breath
+	}
+	else 	if(	Tid_Vol  >  Insp_Tidal_vol*0.8 && peep_delay==1)			// valve control check
+	{		
+		
+			DAC_Output_Set(&DAC2,DAC_CHANNEL_1,Exh_DACVal_1,LTC2607_WR_AND_UPDATE);   // Exhal Valve
+		
+			AVG_PEEP_ACC += ctrlReadParam.Insp_Pressure;                   //accumulating pressure values for peep calculation
+			AVG_CNT++;
+	}
+	
+	if(ctrlReadParam.Insp_Pressure < 1 )  //checking for pressure drop to zero 
+	{
+			peep_error=0;
+			Exh_DACVal_1 = Exh_DACVal_0;
+	}
+	
+	if(Tid_Vol > 0.63*Insp_Tidal_vol && Res_Init == 1) //checking Bergman method of resistance calculation
+	{
+		Res_Init=0;
+		
+	}
+}
+
+void resis_calculation()
+{	
+		P_peak=ventAlgParam.Ppeak;
+		PCM_re=P_peak*60/PEF;	
+		Resistance= PCM_re;
+}
+
+

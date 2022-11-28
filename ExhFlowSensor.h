@@ -1,0 +1,44 @@
+
+#ifndef _EXHFLOWSENSOR_H_
+#define _EXHFLOWSENSOR_H_
+
+////////////////////////////////////////////////////////////////////////////////
+//! \file SFM4200_FlowSensor.h
+///
+///  \brief API for SFM4200_FlowSensor functions
+///
+///  \author 
+///
+///  Copyright (c) 2021 CT Control Technology .
+////////////////////////////////////////////////////////////////////////////////
+
+
+//---[ Includes ]---------------------------------------------------------------
+
+#include <stdint.h>
+#include <math.h>
+#include <stdbool.h>
+
+#include "i2c.h"
+#include "rom.h"
+#include "main.h"
+#include "uartstdio1.h"
+#include "FM3164_Memory.h"
+#include "VentAlgorithm_Handler.h"
+
+extern signed int f_rawdata;
+extern float flowslpm,EXH_FLOW ;
+extern uint8_t len,uart_array_1[8],u8CRC_Cal,u8CRC_Rxd;
+extern const uint8_t uart_array[4];
+extern tech_alarmReg  Tech_Alarmcheck;
+extern calibrationvalues sysParam;
+extern calibrationvalues userParam;
+
+
+
+
+float fAverage_E;
+
+
+
+#endif
